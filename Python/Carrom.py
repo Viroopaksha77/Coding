@@ -27,9 +27,9 @@ yellow = (255, 255, 0)
 pink = (255, 192, 203)
 
 # Fonts
-title_font = pygame.font.Font("Repositories/Wood.ttf", 64)
-button_font = pygame.font.Font("Repositories/Wood.ttf", 32)
-score_font = pygame.font.Font("Repositories/Wood.ttf", 24)
+title_font = pygame.font.SysFont(Arial, 64)
+button_font = pygame.font.SysFont(Arial, 32)
+score_font = pygame.font.SysFont(Arial, 24)
 
 # Game states
 WELCOME_SCREEN = 0
