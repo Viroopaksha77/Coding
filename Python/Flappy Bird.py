@@ -3,13 +3,13 @@ import sys
 import random
 import os
 
-# initialize pygame
+# Initialize pygame
 pygame.init()
 
-# high score file 
+# High score file 
 highscorepath = "Repositories/highscore2.txt"
 
-# function to load high score
+# Function to load high score
 def load_high_score():
     try:
         if os.path.exists(highscorepath):
@@ -19,7 +19,7 @@ def load_high_score():
     except:
         return 0
 
-# function to save high score
+# Function to save high score
 def save_high_score(score):
     # ensure directory exists
     directory = os.path.dirname(highscorepath)
@@ -29,7 +29,7 @@ def save_high_score(score):
     with open(highscorepath, 'w') as file:
         file.write(str(score))
 
-# game constants
+# Game constants
 width = 400
 height = 600
 gravity = 0.25
@@ -41,7 +41,7 @@ initialspeed = 4  # initial game speed
 speedincrease = 0.2  # how much to increase speed per point
 maxspeed = 10  # maximum game speed
 
-# colors
+# Colors
 white = (255, 255, 255)
 black = (0, 0, 0)
 green = (0, 128, 0)
@@ -49,14 +49,14 @@ skyblue = (135, 206, 235)
 yellow = (255, 255, 0)
 red = (255, 0, 0)
 
-# set up the display
+# Set up the display
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption('Flappy Bird')
 clock = pygame.time.Clock()
 font = pygame.font.SysFont('Arial', 30)
 big_font = pygame.font.SysFont('Arial', 50)
 
-# bird class
+# Bird class
 class Bird:
     def __init__(self):
         self.x = 100
@@ -95,7 +95,7 @@ class Bird:
         # return a rectangle for collision detection
         return pygame.Rect(self.x - self.height // 2, int(self.y), self.height, self.height)
 
-# pipe class
+# Pipe class
 class Pipe:
     def __init__(self, game_speed):
         self.x = width
@@ -121,13 +121,13 @@ class Pipe:
     def is_off_screen(self):
         return self.x + 60 < 0
 
-# game functions
+# Game functions
 def draw_floor():
     pygame.draw.rect(screen, green, (0, height - groundheight, width, groundheight))
 
 def draw_background():
     screen.fill(skyblue)
-    # draw some clouds
+    # Draw some clouds
     for i in range(3):
         pygame.draw.circle(screen, white, (100 + i * 150, 100), 30)
         pygame.draw.circle(screen, white, (130 + i * 150, 100), 30)
@@ -139,7 +139,7 @@ def display_score(score, high_score, current_speed=None):
     screen.blit(score_text, (10, 10))
     screen.blit(high_score_text, (10, 50))
     
-    # display current speed if provided
+    # Display current speed if provided
     if current_speed is not None:
         speed_text = font.render(f'Speed: {current_speed:.1f}x', True, black)
         screen.blit(speed_text, (10, 90))
@@ -167,15 +167,15 @@ def welcome_screen():
                 if event.key == pygame.K_SPACE:
                     running = False
         
-        # draw welcome screen
+        # Draw welcome screen
         draw_background()
         draw_floor()
         
-        # title
+        # Title
         title_text = big_font.render('FLAPPY BIRD', True, black)
         screen.blit(title_text, (width // 2 - title_text.get_width() // 2, height // 3))
         
-        # instructions
+        # Instructions
         instruction_text = font.render('Press SPACE to start', True, black)
         screen.blit(instruction_text, (width // 2 - instruction_text.get_width() // 2, height // 2))
         
@@ -202,7 +202,7 @@ def main_game():
     while True:
         current_time = pygame.time.get_ticks()
         
-        # event handling
+        # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -212,7 +212,7 @@ def main_game():
                     # Reset game
                     return
         
-        # check for space key being held down
+        # Check for space key being held down
         keys = pygame.key.get_pressed()
         if keys[pygame.K_SPACE] and game_active:
             # only jump if cooldown has expired
@@ -220,46 +220,46 @@ def main_game():
                 bird.jump()
                 jump_cooldown = current_time
 
-        # draw background
+        # Draw background
         draw_background()
         
         if game_active:
-            # bird movement
+            # Bird movement
             bird.move()
 
-            # generate pipes
+            # Generate pipes
             if current_time - last_pipe > pipefrequency:
                 pipes.append(Pipe(current_game_speed))
                 last_pipe = current_time
 
-            # move and draw pipes
+            # Move and draw pipes
             for pipe in pipes:
                 pipe.move()
                 pipe.draw()
                 
-                # check collision
+                # Check collision
                 if pipe.collide(bird):
                     game_active = False
-                    # update high score if needed
+                    # Update high score if needed
                     if score > high_score:
                         high_score = score
                         save_high_score(high_score)
 
-                # check if pipe is passed
+                # Check if pipe is passed
                 if not pipe.passed and pipe.x + 60 < bird.x:
                     pipe.passed = True
                     score += 1
 
-                    # increase game speed based on score
+                    # Increase game speed based on score
                     new_speed = min(initialspeed + (score * speedincrease), maxspeed)
 
-                    # update game speed for new pipes (existing pipes keep their original speed)
+                    # Update game speed for new pipes (existing pipes keep their original speed)
                     current_game_speed = new_speed
             
-            # remove off-screen pipes
+            # Remove off-screen pipes
             pipes = [pipe for pipe in pipes if not pipe.is_off_screen()]
 
-            # draw bird
+            # Draw bird
             bird.draw()
 
             # check if bird hit the ground
