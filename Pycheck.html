@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Code Review Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+        html, body {
+            font-family: 'Kanit', Arial, Helvetica, sans-serif;
+        }
+        #editor {
+            height: 400px;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 24px 0 rgba(79,70,229,0.10);
+            transition: box-shadow 0.3s;
+        }
+        #editor:focus-within {
+            box-shadow: 0 8px 32px 0 rgba(79,70,229,0.18);
+        }
+        .chart-container {
+            height: 300px;
+            width: 100%;
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.8s cubic-bezier(.4,0,.2,1), transform 0.8s cubic-bezier(.4,0,.2,1);
+        }
+        .chart-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* Custom styles for code output area */
+        .code-output {
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #d1d5db; /* text-gray-300 */
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+            font-size: 0.875rem; /* text-sm */
+            padding: 1rem;
+            border-radius: 0.375rem;
+            min-height: 100px;
+            white-space: pre-wrap; /* Preserves whitespace and wraps text */
+            word-wrap: break-word; /* Breaks long words */
+            overflow-x: auto; /* For horizontal scrolling if needed */
+            box-shadow: 0 2px 12px 0 rgba(31,41,55,0.10);
+            transition: box-shadow 0.3s, background 0.3s;
+        }
+        .code-output:hover {
+            background: #111827;
+            box-shadow: 0 6px 24px 0 rgba(79,70,229,0.15);
+        }
+        .bg-white {
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        .bg-white:hover {
+            box-shadow: 0 8px 32px 0 rgba(79,70,229,0.18);
+            transform: translateY(-4px) scale(1.01);
+        }
+        button {
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px 0 rgba(79,70,229,0.08);
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+        button:focus {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+        select {
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px #6366f1;
+        }
+        .prose {
+            animation: fadeInUp 0.8s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        h1, h2 {
+            animation: floatIn 1s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes floatIn {
+            from {
+                opacity: 0;
+                transform: translateY(-30px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .bg-indigo-50 {
+            animation: fadeIn 1.2s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            background: #e0e7ef;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #6366f1;
+            border-radius: 4px;
+        }
+        /* Card pop-in on scroll */
+        .pop-in {
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+            transition: opacity 0.7s cubic-bezier(.4,0,.2,1), transform 0.7s cubic-bezier(.4,0,.2,1);
+        }
+        .pop-in.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .main-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+        .main-title {
+            font-size: 2.25rem;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #4338ca;
+            animation: floatIn 1s cubic-bezier(.4,0,.2,1);
+        }
+        .intro-card {
+            background: #fff;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 24px 0 rgba(79,70,229,0.10);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .intro-text {
+            color: #6366f1;
+            font-weight: 500;
+        }
+        .layout-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            align-items: stretch;
+            width: 100%;
+        }
+        .editor-section,
+        .metrics-section {
+            width: 100%;
+            max-width: 100%;
+        }
+        .editor-card,
+        .output-card,
+        .feedback-card,
+        .metrics-card,
+        .warning-card {
+            margin-bottom: 1.5rem;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        @media (min-width: 1024px) {
+            .layout-grid {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+        /* Remove grid-column from .editor-section and .metrics-section */
+        .editor-section,
+        .metrics-section {
+            grid-column: unset;
+        }
+        .editor-card, .output-card, .feedback-card, .metrics-card, .warning-card {
+            background: #fff;
+            border-radius: 0.375rem;
+            box-shadow: 0 4px 24px 0 rgba(79,70,229,0.10);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: box-shadow 0.3s, transform 0.3s;
+        }
+        .editor-card:hover, .output-card:hover, .feedback-card:hover, .metrics-card:hover, .warning-card:hover {
+            box-shadow: 0 8px 32px 0 rgba(79,70,229,0.18);
+            transform: translateY(-4px) scale(1.01);
+        }
+        .editor-title, .output-title, .feedback-title, .metrics-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #312e81;
+            animation: floatIn 1s cubic-bezier(.4,0,.2,1);
+        }
+        .template-label {
+            color: #374151;
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .template-dropdown {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            font-size: 1rem;
+            transition: border 0.2s, box-shadow 0.2s;
+        }
+        .template-dropdown:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px #6366f1;
+            outline: none;
+        }
+        .editor-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+        }
+        .analyze-btn, .run-btn {
+            font-weight: bold;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 2px 8px 0 rgba(79,70,229,0.08);
+        }
+        .analyze-btn {
+            background: #6366f1;
+            color: #fff;
+        }
+        .analyze-btn:hover {
+            background: #4f46e5;
+        }
+        .run-btn {
+            background: #22c55e;
+            color: #fff;
+        }
+        .run-btn:hover {
+            background: #16a34a;
+        }
+        .review-feedback {
+            animation: fadeInUp 0.8s cubic-bezier(.4,0,.2,1);
+            color: #374151;
+        }
+        .metrics-section {
+            grid-column: 2 / span 1;
+        }
+        .metrics-card {
+            margin-bottom: 1.5rem;
+        }
+        .warning-card {
+            margin-bottom: 2rem;
+        }
+        .warning-text {
+            color: #ef4444;
+            font-weight: 500;
+        }
+        .external-link {
+            color: #2563eb;
+            text-decoration: underline;
+            transition: color 0.2s;
+        }
+        .external-link:hover {
+            color: #1e40af;
+        }
+        .score-value {
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+            font-weight: 600;
+            border-radius: 0.375rem;
+            padding: 0.15em 0.7em 0.15em 0.7em;
+            font-size: 1.05em;
+            letter-spacing: 0.01em;
+            margin-left: 0.5em;
+            transition: background 0.3s, color 0.3s;
+        }
+        .score-green {
+            color: #15803d;
+        }
+        .score-bg-green {
+            background: #dcfce7;
+        }
+        .score-yellow {
+            color: #b45309;
+        }
+        .score-bg-yellow {
+            background: #fef9c3;
+        }
+        .score-red {
+            color: #b91c1c;
+        }
+        .score-bg-red {
+            background: #fee2e2;
+        }
+        .metric-feedback {
+            margin-bottom: 0.5rem;
+        }
+        /* ...existing code... */
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="main-container">
+            <h1 class="main-title">Python Code Playground & Review</h1>
+
+            <div class="intro-card">
+                <p class="intro-text">Try modifying the Python code below and see how it affects the code quality metrics in real-time!</p>
+            </div>
+            
+            <div class="layout-grid">
+                <div class="editor-section">
+                    <div class="editor-card">
+                        <h2 class="editor-title">Python Code Editor</h2>
+                        <div class="template-select">
+                            <label for="codeTemplate" class="template-label">Load Example:</label>
+                            <select id="codeTemplate" class="template-dropdown">
+                                <option value="basic">Basic Example of a Function (Start Here)</option>
+                                <option value="intermediate">Intermediate Example</option>
+                                <option value="advanced">Advanced Example</option>
+                                <option value="problematic">Problematic Code</option>
+                            </select>
+                        </div>
+                        <div id="editor"></div>
+                        <div class="editor-actions">
+                            <button id="analyzeBtn" class="analyze-btn">Analyze</button>
+                            <button id="runCodeBtn" class="run-btn">Run</button>
+                        </div>
+                    </div>
+                    
+                    <div class="output-card">
+                        <h2 class="output-title">Code Output</h2>
+                        <div id="codeOutput" class="code-output">
+                            The output of your Python code will appear here after clicking "Run".
+                        </div>
+                    </div>
+                    
+                    <div class="feedback-card">
+                        <h2 class="feedback-title">Code Review Feedback</h2>
+                        <div id="reviewFeedback" class="review-feedback">
+                            <p>Edit the code and click "Analyze" to see feedback.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metrics-section">
+                    <div class="metrics-card">
+                        <h2 class="metrics-title">Code Quality Metrics</h2>
+                        <div class="chart-container">
+                            <canvas id="qualityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="warning-card">
+                <p class="warning-text">The code editor only supports Python code without any external modules or libraries. If you need to use modules like <a href="https://numpy.org/" target="_blank" class="external-link">NumPy</a> or <a href="https://pandas.pydata.org/" target="_blank" class="external-link">Pandas</a>, consider using online tools or services designed for such purposes. User input cannot be handled by this tool due to security reasons. Please ensure your code does not contain sensitive information before running it.</p>
+            </div>
+    </div>
+    
+    <script>
+        let editor = null;
+        let qualityChart = null;
+        let currentMetrics = {
+            readability: 0,
+            complexity: 0,
+            errorHandling: 0,
+            documentation: 0,
+            efficiency: 0
+        };
+
+        const codeTemplates = {
+            basic: `def calculate_average(numbers: list[int | float]) -> float:
+    """
+    Calculate the average of a list of numbers.
+    Args:
+        numbers (list): A list of integers or floats.
+
+    Returns:
+        float: The average of the numbers in the list.
+    """
+    total = sum(numbers)
+    count = len(numbers)
+    # Avoid ZeroDivisionError if numbers is empty
+    if count == 0:
+        return 0
+    average = total / count
+    return average
+
+# Example usage
+sample_data = [10, 15, 20, 25, 30]
+result = calculate_average(sample_data)
+print(f"The average of {sample_data} is {result}")
+`,
+
+            intermediate: `def process_student_data(students):
+    """
+    Process student data to calculate average scores and identify top performers.
+
+    Args:
+        students: List of dictionaries containing student information
+                 Each dict should have 'name' and 'scores' keys
+
+    Returns:
+        Dictionary with average scores and top student names
+    """
+    if not students:
+        return {"average": 0, "top_students": []}
+
+    try:
+        student_averages = []
+        for student in students:
+            scores = student.get('scores', [])
+            if scores: # Ensure scores list is not empty
+                avg = sum(scores) / len(scores)
+                student_averages.append((student['name'], avg))
+
+        if not student_averages: # Handle case where no students have scores
+            return {"average": 0, "top_students": []}
+
+        overall_avg = sum(avg for _, avg in student_averages) / len(student_averages)
+
+        top_students = [name for name, avg in student_averages if avg > overall_avg]
+
+        return {
+            "average": round(overall_avg, 2),
+            "top_students": top_students
+        }
+    except TypeError as e: # More specific exception for non-numeric scores
+        print(f"Data type error processing student data: {e}")
+        return {"average": 0, "top_students": [], "error": str(e)}
+    except Exception as e: # Catch other unexpected errors
+        print(f"An unexpected error occurred: {e}")
+        return {"average": 0, "top_students": [], "error": str(e)}
+`,
+
+            advanced: `class DataProcessor:
+    """
+    A class for processing and analyzing numerical datasets.
+
+    This class provides methods to load, validate, transform, and analyze
+    numerical data with proper error handling and performance optimization.
+    """
+
+    def __init__(self, data=None):
+        """
+        Initialize the DataProcessor with optional data.
+
+        Args:
+            data (list or None): Initial dataset to process
+        """
+        self.data = data if data is not None else []
+        self.processed_data = None
+        self.statistics = {}
+
+    def validate_data(self):
+        """
+        Validate that all data elements are numerical.
+
+        Returns:
+            bool: True if all elements are numbers, False otherwise
+        """
+        if not isinstance(self.data, list):
+            return False
+
+        if not self.data:
+            return False # An empty list might be valid, depending on context, but let's assume it needs data.
+
+        try:
+            return all(isinstance(item, (int, float)) for item in self.data)
+        except TypeError: # This try-except around all() is a bit redundant given isinstance check
+            return False
+
+    def process(self):
+        """
+        Process the data and calculate basic statistics.
+
+        Returns:
+            dict: Calculated statistics or error message
+        """
+        if not self.validate_data():
+            return {"error": "Invalid data format. Expected numerical values."}
+
+        if not self.data: # Ensure data is not empty after validation
+            return {"error": "No data to process."}
+
+        try {
+            # Sort data for efficient calculations (median, min/max)
+            sorted_data = sorted(self.data)
+            n = len(sorted_data);
+
+            self.statistics = {
+                "count": n,
+                "min": sorted_data[0],
+                "max": sorted_data[-1],
+                "sum": sum(sorted_data),
+                "mean": sum(sorted_data) / n,
+                "median": sorted_data[n//2] if n % 2 != 0 else
+                          (sorted_data[n//2 - 1] + sorted_data[n//2]) / 2
+            };
+
+            # Calculate standard deviation
+            mean = self.statistics["mean"];
+            variance = sum((x - mean) ** 2 for x in sorted_data) / n;
+            self.statistics["std_dev"] = variance ** 0.5;
+
+            return self.statistics;
+        } catch (Exception as e) {
+            return {"error": f"Processing error: {str(e)}"};
+        }
+    }
+
+    def transform(self, operation):
+        """
+        Apply a transformation function to each data element.
+
+        Args:
+            operation (callable): Function to apply to each element
+
+        Returns:
+            DataProcessor: New instance with transformed data or an empty one on error
+        """
+        if not callable(operation):
+            raise TypeError("Operation must be a callable function")
+
+        try {
+            transformed_data = [operation(x) for x in self.data];
+            return DataProcessor(transformed_data);
+        } catch (Exception as e) {
+            // In a real scenario, you might want to log this or raise it
+            // For this simulator, we'll just return an empty processor or handle it in UI
+            print(f"Transformation error: {e}");
+            return DataProcessor([]); # Return an empty processor on error
+        }
+    }`,
+
+            problematic: `def calc(x, y):
+    # This function is too short and could be inlined or removed
+    z = x+y
+    return z
+
+def process_data(data):
+    # This loop can be replaced with a list comprehension for efficiency
+    result = []
+    for i in range(len(data)):
+        result.append(data[i] * 2) # Inefficient appends in loop
+    return result
+
+def find_max(numbers):
+    # What if numbers is empty? This will raise an IndexError
+    m = numbers[0]
+    for i in range(1, len(numbers)):
+        if numbers[i] > m:
+            m = numbers[i]
+    return m
+
+# Process some values
+vals = [1, 2, 3, 4, 5]
+doubled = process_data(vals)
+maximum = find_max(vals) # No error handling for empty list
+print(f"Doubled: {doubled}")
+print(f"Maximum: {maximum}")`
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            editor = ace.edit("editor");
+            editor.setTheme("ace/theme/monokai");
+            editor.session.setMode("ace/mode/python");
+            editor.setValue(codeTemplates.basic);
+            editor.clearSelection();
+            editor.session.setUseWrapMode(true); // Enable word wrap
+
+            initializeChart();
+
+            document.getElementById('analyzeBtn').addEventListener('click', analyzeCode);
+            document.getElementById('runCodeBtn').addEventListener('click', runPythonCode); // New Event Listener
+
+            document.getElementById('codeTemplate').addEventListener('change', function() {
+                const template = this.value;
+                if (codeTemplates[template]) {
+                    editor.setValue(codeTemplates[template]);
+                    // Clear previous output and feedback when a new template is loaded
+                    document.getElementById('codeOutput').textContent = 'The output of your Python code will appear here after clicking "Run Code".';
+                    document.getElementById('reviewFeedback').innerHTML = '<p>Edit the code and click "Analyze Code" to see feedback.</p>';
+                }
+            });
+        });
+
+        function initializeChart() {
+            const ctx = document.getElementById('qualityChart').getContext('2d');
+            if (qualityChart) {
+                qualityChart.destroy();
+            }
+            qualityChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Readability', 'Complexity', 'Error Handling', 'Documentation', 'Efficiency'],
+                    datasets: [{
+                        label: 'Code Quality',
+                        data: [0, 0, 0, 0, 0], // Initial values
+                        backgroundColor: 'rgba(79, 70, 229, 0.2)', // indigo-600 with opacity
+                        borderColor: 'rgba(79, 70, 229, 1)', // indigo-600
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: {
+                                color: '#d1d5db' // gray-300
+                            },
+                            grid: {
+                                color: '#d1d5db' // gray-300
+                            },
+                            pointLabels: {
+                                font: {
+                                    size: 12,
+                                    weight: 'bold'
+                                },
+                                color: '#374151' // gray-700
+                            },
+                            min: 0,
+                            max: 10,
+                            ticks: {
+                                display: false,
+                                beginAtZero: true
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function analyzeCode() {
+            const code = editor.getValue();
+            const metrics = calculateMetrics(code);
+            updateChart(metrics);
+            generateFeedback(metrics, code);
+        }
+
+        function updateChart(metrics) {
+            qualityChart.data.datasets[0].data = [
+                metrics.readability,
+                metrics.complexity,
+                metrics.errorHandling,
+                metrics.documentation,
+                metrics.efficiency
+            ];
+            qualityChart.update();
+        }
+
+        // --- NEW FUNCTIONALITY: Run Python Code ---
+        async function runPythonCode() {
+            const code = editor.getValue();
+            const outputElement = document.getElementById('codeOutput');
+            outputElement.textContent = 'Running code...';
+            outputElement.classList.remove('text-red-500'); // Remove error color if present
+            outputElement.classList.add('text-gray-300'); // Set default text color
+
+            try {
+                // Piston API endpoint (make sure to check their current API documentation)
+                // As of my last update, piston.gg was a good option for small projects.
+                // Always check the current API endpoint and requirements.
+                const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        language: 'python',
+                        version: '3.10.0', // You can specify a Python version, check Piston's supported runtimes
+                        files: [
+                            {
+                                name: 'main.py',
+                                content: code
+                            }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    let output = '';
+                    if (data.run && data.run.stdout) {
+                        output += data.run.stdout;
+                    }
+                    if (data.run && data.run.stderr) {
+                        output += `\nError:\n${data.run.stderr}`;
+                        outputElement.classList.remove('text-gray-300');
+                        outputElement.classList.add('text-red-500'); // Indicate error with red text
+                    }
+                    if (data.compile && data.compile.stdout) { // For languages that compile
+                        output += `\nCompile Output:\n${data.compile.stdout}`;
+                    }
+                    if (data.compile && data.compile.stderr) {
+                        output += `\nCompile Error:\n${data.compile.stderr}`;
+                        outputElement.classList.remove('text-gray-300');
+                        outputElement.classList.add('text-red-500'); // Indicate error with red text
+                    }
+
+                    if (!output) {
+                         output = "No output produced (or code finished without printing anything).";
+                    }
+                    outputElement.textContent = output;
+
+                } else {
+                    console.error('API Error:', data);
+                    outputElement.textContent = `Error executing code: ${data.message || 'Unknown error'}`;
+                    outputElement.classList.remove('text-gray-300');
+                    outputElement.classList.add('text-red-500');
+                }
+
+            } catch (error) {
+                console.error('Network or API request failed:', error);
+                outputElement.textContent = `Failed to connect to execution service. Check your internet connection or try again later. (${error.message})`;
+                outputElement.classList.remove('text-gray-300');
+                outputElement.classList.add('text-red-500');
+            }
+        }
+        // --- END NEW FUNCTIONALITY ---
+
+        // --- Metric Calculation Functions (No significant changes needed here) ---
+        function calculateMetrics(code) {
+            try {
+                const metrics = {
+                    readability: 0,
+                    complexity: 0,
+                    errorHandling: 0,
+                    documentation: 0,
+                    efficiency: 0
+                };
+
+                if (!code || code.length < 10) {
+                    return metrics;
+                }
+
+                metrics.readability = calculateReadabilityScore(code);
+                metrics.complexity = calculateComplexityScore(code);
+                metrics.errorHandling = calculateErrorHandlingScore(code);
+                metrics.documentation = calculateDocumentationScore(code);
+                metrics.efficiency = calculateEfficiencyScore(code);
+
+                currentMetrics = { ...metrics }; // Store current metrics
+                return metrics;
+            } catch (error) {
+                console.error("Error calculating metrics:", error);
+                return {
+                    readability: 0,
+                    complexity: 0,
+                    errorHandling: 0,
+                    documentation: 0,
+                    efficiency: 0
+                };
+            }
+        }
+
+        function calculateReadabilityScore(code) {
+            let score = 5;
+            const lines = code.split('\n');
+            const longLines = lines.filter(line => line.length > 79).length;
+            score -= (longLines / lines.length) * 3;
+
+            const variableRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*=/g;
+            let match;
+            let totalVars = 0;
+            let goodVars = 0;
+
+            while ((match = variableRegex.exec(code)) !== null) {
+                totalVars++;
+                if (/^[a-z_][a-z0-9_]*$/.test(match[1]) && !match[1].startsWith('__')) { // Exclude dunder methods
+                    goodVars++;
+                }
+            }
+
+            if (totalVars > 0) {
+                score += (goodVars / totalVars) * 2;
+            }
+
+            const indentations = lines.map(line => {
+                const match = line.match(/^(\s*)/);
+                return match ? match[1].length : 0;
+            });
+
+            const uniqueIndents = new Set(indentations.filter(i => i > 0));
+            if (uniqueIndents.size <= 2) { // Allow for 0 and one common indent size (e.g., 4)
+                score += 1;
+            } else {
+                score -= 1; // Inconsistent indentation
+            }
+
+            const blankLineRatio = lines.filter(line => line.trim() === '').length / lines.length;
+            if (blankLineRatio > 0.4) {
+                score -= 1;
+            } else if (blankLineRatio > 0.1 && blankLineRatio <= 0.3) {
+                score += 1;
+            }
+
+            return Math.max(0, Math.min(10, score));
+        }
+
+        function calculateComplexityScore(code) {
+            let score = 5;
+            const controlStructures = (code.match(/\b(if|elif|else|for|while|try|except|with|def|class)\b/g) || []).length;
+            const lines = code.split('\n').length;
+
+            const controlDensity = controlStructures / lines;
+
+            if (controlDensity > 0.3) {
+                score -= 3;
+            } else if (controlDensity > 0.15) {
+                score -= 1;
+            } else if (controlDensity > 0.05) {
+                score += 1;
+            }
+
+            const indentLevels = code.split('\n').map(line => {
+                const match = line.match(/^(\s*)/);
+                return match ? Math.floor(match[1].length / 4) : 0; // Assuming 4 spaces per indent
+            });
+
+            const maxIndent = indentLevels.length > 0 ? Math.max(...indentLevels) : 0;
+            if (maxIndent > 4) {
+                score -= 2;
+            } else if (maxIndent > 2) {
+                score -= 1;
+            }
+
+            const functionMatches = code.match(/def\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(/g) || [];
+            if (functionMatches.length > 0) {
+                // Approximate lines per function: total lines / number of functions
+                const avgLinesPerFunction = lines / functionMatches.length;
+                if (avgLinesPerFunction > 35) {
+                    score -= 2;
+                } else if (avgLinesPerFunction < 10 && functionMatches.length > 3) {
+                    // Too many very small functions might also indicate over-decomposition
+                    // This is a subtle point, so give a small penalty or keep neutral
+                    score -= 0.5;
+                } else if (avgLinesPerFunction >= 10 && avgLinesPerFunction <= 25) {
+                    score += 1;
+                }
+            }
+
+            if (code.includes('class ')) {
+                score += 1;
+            }
+
+            // Check for nested loops (simple regex)
+            if (code.match(/for\s+.*:\s*\n\s+.*for\s+.*:/) || code.match(/while\s+.*:\s*\n\s+.*while\s+.*:/)) {
+                score -= 1.5;
+            }
+
+            return Math.max(0, Math.min(10, score));
+        }
+
+        function calculateErrorHandlingScore(code) {
+            let score = 5;
+
+            const tryBlocks = (code.match(/\btry\b/g) || []).length;
+            if (tryBlocks > 0) {
+                score += 2;
+
+                const specificExceptions = (code.match(/except\s+[A-Za-z0-9_]+\b/g) || []).length;
+                const genericExceptions = (code.match(/except\s*:\s*[^A-Za-z0-9_]/g) || []).length; // Catches `except:` or `except \n`
+
+                if (specificExceptions > genericExceptions) {
+                    score += 1;
+                } else if (genericExceptions > 0) {
+                    score -= 2; // Penalize bare except more
+                }
+            }
+
+            // Simple check for basic input validation patterns
+            if (code.includes('if not') ||
+                code.includes('if len(') ||
+                code.includes('if isinstance(') ||
+                code.includes('if type(') ||
+                code.includes('assert ')) {
+                score += 1;
+            }
+
+            if (code.includes('.get(')) { // Dictionary get with default
+                score += 0.5;
+            }
+
+            if (code.includes('finally:')) {
+                score += 1;
+            }
+
+            // Look for logging
+            if (code.includes('import logging') || code.includes('logging.')) {
+                 score += 1;
+            } else if ((code.match(/print\(.*(error|exception|failed|debug|warning|info).*\)/gi) || []).length > 0) {
+                // Simple print statements for errors are better than nothing
+                score += 0.5;
+            }
+
+
+            return Math.max(0, Math.min(10, score));
+        }
+
+        function calculateDocumentationScore(code) {
+            let score = 5;
+
+            const docstrings = (code.match(/"""[\s\S]*?"""|'''[\s\S]*?'''/g) || []).length; // Account for both """ and '''
+            const functions = (code.match(/def\s+[a-zA-Z_][a-zA-Z0-9_]*\s*\(/g) || []).length;
+            const classes = (code.match(/class\s+[a-zA-Z_][a-zA-Z0-9_]*\s*[:\(]/g) || []).length;
+
+            if (docstrings > 0) {
+                score += 2;
+
+                // Check for module-level docstring (at the very beginning)
+                if (code.trim().startsWith('"""') || code.trim().startsWith("'''")) {
+                    score += 0.5;
+                }
+
+                // Check for structured docstrings within functions/classes
+                const structuredDocstringCount = (code.match(/(Args:|Parameters:|Returns:|Raises:|Yields:)/g) || []).length;
+                if (structuredDocstringCount > 0) {
+                    score += 1;
+                }
+            }
+
+
+            const commentLines = (code.match(/^\s*#.*$/gm) || []).length;
+            const linesOfCode = code.split('\n').filter(line => line.trim().length > 0 && !line.trim().startsWith('#')).length;
+
+            if (linesOfCode > 0) { // Avoid division by zero
+                const commentRatio = commentLines / linesOfCode;
+
+                if (commentRatio > 0.4) { // High comment ratio
+                    score += 1.5;
+                } else if (commentRatio > 0.15) { // Moderate comment ratio
+                    score += 0.5;
+                }
+            }
+
+
+            // Reward if number of docstrings is close to or equals number of functions/classes
+            if ((functions + classes) > 0 && docstrings >= (functions + classes) * 0.75) {
+                score += 1;
+            } else if ((functions + classes) > 0 && docstrings > 0) {
+                score += 0.5;
+            }
+
+            return Math.max(0, Math.min(10, score));
+        }
+
+        function calculateEfficiencyScore(code) {
+            let score = 5;
+
+            // Positive indicators
+            if (code.includes('[') && code.includes('for') && code.includes('in') && (code.match(/\[\s*[^\]]+\s+for\s+/g) || []).length > 0) {
+                score += 1; // List comprehensions
+            }
+            if (code.includes('set(') || code.includes('{') && code.includes(':') && !code.includes('def') && (code.match(/{.*?}/g) || []).length > 0) {
+                score += 0.5; // Using sets or dictionaries
+            }
+            if (code.includes('map(') || code.includes('filter(') || code.includes('zip(') || code.includes('enumerate(')) {
+                score += 0.5; // Built-in functions
+            }
+            if ((code.match(/\(.*for\s+.*in.*\)/g) || []).length > 0) {
+                score += 0.5; // Generator expressions
+            }
+            if (code.includes('.join(')) {
+                score += 1; // Efficient string concatenation
+            }
+
+
+            // Negative indicators
+            const inefficientLoopAppend = (code.match(/for\s+.*:\s*\n\s+.*\.append\(/g) || []).length;
+            const listCompInstead = (code.match(/\[\s*[^\]]+\s+for\s+/g) || []).length;
+            if (inefficientLoopAppend > 0 && listCompInstead === 0) { // If loops with appends are used without comprehensions
+                score -= 1;
+            }
+
+            if ((code.match(/range\(len\(/g) || []).length > 0) {
+                score -= 0.5; // Could use enumerate
+            }
+
+            if ((code.match(/\s*\+\s*['"]/g) || []).length > 0 && !code.includes('.join(')) {
+                score -= 0.5; // Inefficient string concatenation
+            }
+
+            // Multiple passes over data (e.g., sorting multiple times when one would suffice)
+            const sortedCalls = (code.match(/\bsorted\(/g) || []).length;
+            const sortMethodCalls = (code.match(/\.sort\(/g) || []).length;
+            if (sortedCalls > 1 || sortMethodCalls > 1) {
+                score -= 0.5;
+            }
+
+            // Using global variables excessively (hard to detect perfectly with regex, but a hint)
+            if (code.match(/global\s+[a-zA-Z_][a-zA-Z0-9_]*/) && (code.match(/global\s+[a-zA-Z_][a-zA-Z0-9_]*/g) || []).length > 1) {
+                score -= 0.5;
+            }
+
+            return Math.max(0, Math.min(10, score));
+        }
+
+        // --- Feedback Generation Functions (No significant changes needed here) ---
+        function generateFeedback(metrics, code) {
+            let feedback = '<div class="space-y-4">';
+
+            const overallScore = (
+                metrics.readability +
+                metrics.complexity +
+                metrics.errorHandling +
+                metrics.documentation +
+                metrics.efficiency
+            ) / 5;
+
+            const scoreClass = overallScore >= 7 ? 'text-green-600' :
+                               overallScore >= 5 ? 'text-yellow-600' : 'text-red-600';
+
+            feedback += `<div class="bg-gray-50 p-4 rounded-md">
+                <h3 class="font-semibold text-lg">Overall Score: <span class="${scoreClass}">${overallScore.toFixed(1)}/10</span></h3>
+                <p class="text-gray-600 text-sm mt-1">${getOverallFeedback(overallScore)}</p>
+            </div>`;
+
+            feedback += '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">';
+
+            feedback += generateMetricFeedback('Readability', metrics.readability, getReadabilityFeedback(code, metrics.readability));
+            feedback += generateMetricFeedback('Complexity', metrics.complexity, getComplexityFeedback(code, metrics.complexity));
+            feedback += generateMetricFeedback('Error Handling', metrics.errorHandling, getErrorHandlingFeedback(code, metrics.errorHandling));
+            feedback += generateMetricFeedback('Documentation', metrics.documentation, getDocumentationFeedback(code, metrics.documentation));
+            feedback += generateMetricFeedback('Efficiency', metrics.efficiency, getEfficiencyFeedback(code, metrics.efficiency));
+
+            feedback += '</div>';
+
+            feedback += '<div class="bg-indigo-50 p-4 rounded-md mt-6">';
+            feedback += '<h3 class="font-semibold text-indigo-700 text-lg mb-2">Suggestions for Improvement</h3>';
+            feedback += '<ul class="list-disc pl-5 text-sm space-y-1 text-gray-700">';
+
+            const suggestions = getImprovementSuggestions(metrics, code);
+            suggestions.forEach(suggestion => {
+                feedback += `<li>${suggestion}</li>`;
+            });
+
+            feedback += '</ul></div>';
+
+            feedback += '</div>';
+
+            document.getElementById('reviewFeedback').innerHTML = feedback;
+        }
+
+        function generateMetricFeedback(name, score, feedbackText) {
+            let scoreClass = '';
+            let scoreBg = '';
+            if (score >= 7) {
+                scoreClass = 'score-green';
+                scoreBg = 'score-bg-green';
+            } else if (score >= 5) {
+                scoreClass = 'score-yellow';
+                scoreBg = 'score-bg-yellow';
+            } else {
+                scoreClass = 'score-red';
+                scoreBg = 'score-bg-red';
+            }
+            return `<div class="p-3 border border-gray-300 rounded-md metric-feedback">
+                <h3 class="font-medium text-base">${name}: <span class="score-value ${scoreClass} ${scoreBg}">${score.toFixed(1)}/10</span></h3>
+                <p class="text-sm mt-1 text-gray-600">${feedbackText}</p>
+            </div>`;
+        }
+
+        function getOverallFeedback(score) {
+            if (score >= 8) {
+                return "Excellent code quality! This code follows best practices and would pass a professional code review with minimal comments.";
+            } else if (score >= 6) {
+                return "Good code quality. There are some areas for improvement, but the code is generally well-written.";
+            } else if (score >= 4) {
+                return "Average code quality. The code works but has several areas that could be improved to meet professional standards.";
+            } else {
+                return "This code needs significant improvement to meet professional standards. Focus on the suggestions below.";
+            }
+        }
+
+        function getReadabilityFeedback(code, score) {
+            if (score >= 7) {
+                return "The code is very readable with good naming conventions and consistent formatting.";
+            } else if (score >= 5) {
+                return "The code is reasonably readable but could benefit from more consistent naming and formatting.";
+            } else {
+                return "The code has readability issues. Consider using more descriptive names and consistent formatting.";
+            }
+        }
+
+        function getComplexityFeedback(code, score) {
+            if (score >= 7) {
+                return "The code has good complexity management with appropriate function decomposition.";
+            } else if (score >= 5) {
+                return "The code has moderate complexity. Consider breaking down complex functions into smaller ones.";
+            } else {
+                return "The code is overly complex. Refactor to reduce nesting and break down large functions.";
+            }
+        }
+
+        function getErrorHandlingFeedback(code, score) {
+            if (score >= 7) {
+                return "Good error handling with appropriate try-except blocks and input validation.";
+            } else if (score >= 5) {
+                return "Basic error handling is present but could be more comprehensive.";
+            } else {
+                return "Insufficient error handling. Add try-except blocks and input validation to make the code more robust.";
+            }
+        }
+
+        function getDocumentationFeedback(code, score) {
+            if (score >= 7) {
+                return "Well-documented code with comprehensive docstrings and helpful comments.";
+            } else if (score >= 5) {
+                return "The code has some documentation but could benefit from more detailed docstrings.";
+            } else {
+                return "The code lacks sufficient documentation. Add docstrings and comments to explain the code's purpose and behavior.";
+            }
+        }
+
+        function getEfficiencyFeedback(code, score) {
+            if (score >= 7) {
+                return "The code uses efficient algorithms and data structures with good performance characteristics.";
+            } else if (score >= 5) {
+                return "The code has reasonable efficiency but could be optimized in some areas.";
+            } else {
+                return "The code has efficiency issues. Consider using more appropriate data structures and algorithms.";
+            }
+        }
+
+        function getImprovementSuggestions(metrics, code) {
+            const suggestions = [];
+
+            if (metrics.readability < 7) {
+                if (code.match(/\b[A-Z][a-zA-Z0-9_]*\b(?!\()/g)) { // Look for PascalCase variables (not classes)
+                    suggestions.push("Use snake_case for variable and function names (PEP 8).");
+                }
+                if (code.split('\n').some(line => line.length > 79)) {
+                    suggestions.push("Keep line length under 80 characters for better readability (PEP 8).");
+                }
+                const indentations = code.split('\n').map(line => {
+                    const match = line.match(/^(\s*)/);
+                    return match ? match[1].length : 0;
+                });
+                const uniqueIndents = new Set(indentations.filter(i => i > 0));
+                if (uniqueIndents.size > 1 && ![2,4].includes(Array.from(uniqueIndents)[0])) { // Check for inconsistent non-zero indents, or not 2/4 spaces
+                    suggestions.push("Use consistent indentation (4 spaces per level is the Python standard).");
+                }
+            }
+
+            if (metrics.complexity < 7) {
+                // Simple heuristic for nested if/loops
+                const nestedIfLoopMatch = code.match(/(if|for|while)\s*.*:\s*\n\s+.*(if|for|while)\s*.*:/g);
+                if (nestedIfLoopMatch && nestedIfLoopMatch.length > 0) {
+                     suggestions.push("Reduce nested conditionals and loops by using early returns or breaking down logic.");
+                }
+                if (code.split('\n').length > 40 && (code.match(/def\s+/g) || []).length < 2) {
+                    suggestions.push("Break down large functions into smaller, more focused functions.");
+                }
+            }
+
+            if (metrics.errorHandling < 7) {
+                if (!code.includes('try:')) {
+                    suggestions.push("Add try-except blocks to handle potential exceptions gracefully.");
+                }
+                if (code.includes('except:') && !code.match(/except\s+[A-Za-z0-9_]+:/)) {
+                    suggestions.push("Use specific exception types instead of bare 'except' clauses to avoid masking errors.");
+                }
+                if (code.includes('def ') && !(code.includes('if not ') || code.includes('if len(') || code.includes('isinstance'))) {
+                    suggestions.push("Add input validation to functions to handle edge cases and invalid inputs.");
+                }
+            }
+
+            if (metrics.documentation < 7) {
+                if (!code.includes('"""') && !code.includes("'''")) {
+                    suggestions.push("Add docstrings to functions and classes explaining their purpose and parameters.");
+                }
+                if (code.includes('def ') && !(code.includes('Args:') || code.includes('Returns:'))) {
+                    suggestions.push("Use structured docstrings (e.g., with 'Args:', 'Returns:') for clarity.");
+                }
+                const commentLines = (code.match(/^\s*#.*$/gm) || []).length;
+                if (commentLines < code.split('\n').length * 0.1) {
+                    suggestions.push("Add comments to explain complex or non-obvious code sections.");
+                }
+            }
+
+            if (metrics.efficiency < 7) {
+                if (code.includes('for') && code.includes('.append') && !code.match(/\[\s*[^\]]+\s+for\s+/)) {
+                    suggestions.push("Use list comprehensions instead of building lists with for loops and append().");
+                }
+                if (code.includes('for') && code.includes('in range(len(')) {
+                    suggestions.push("Use `enumerate()` or direct iteration instead of `range(len())` for loops with indexes.");
+                }
+                if (code.match(/\s*\+\s*['"]/g) && !code.includes('.join(')) {
+                    suggestions.push("Use f-strings, `.format()`, or `.join()` instead of inefficient string concatenation with `+` operator.");
+                }
+            }
+
+            if (suggestions.length === 0) {
+                suggestions.push("Your code looks great! Keep up the good work.");
+            }
+            // Add general suggestions if specific ones are few
+            if (suggestions.length < 3) {
+                suggestions.push("Always strive to follow PEP 8 style guidelines for consistent, readable code.");
+                suggestions.push("Consider writing unit tests to verify your code's functionality and prevent regressions.");
+                suggestions.push("Explore type hints to improve code clarity and enable static analysis.");
+            }
+
+            return suggestions.slice(0, 5); // Return at most 5 suggestions
+        }
+
+        // --- Scroll-based animation for cards and chart ---
+        function onScrollAnimate() {
+            const popIns = document.querySelectorAll('.bg-white, .pop-in');
+            const chart = document.querySelector('.chart-container');
+            const trigger = window.innerHeight * 0.92;
+            popIns.forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if (rect.top < trigger) {
+                    el.classList.add('visible');
+                }
+            });
+            if (chart) {
+                const rect = chart.getBoundingClientRect();
+                if (rect.top < trigger) {
+                    chart.classList.add('visible');
+                }
+            }
+        }
+        document.addEventListener('scroll', onScrollAnimate);
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add pop-in class to all cards for animation
+            document.querySelectorAll('.bg-white').forEach(el => el.classList.add('pop-in'));
+            onScrollAnimate();
+        });
+    </script>
+</body>
+</html>
